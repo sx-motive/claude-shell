@@ -15,6 +15,8 @@ import {
   ptySpawn,
   ptyWrite,
 } from "../lib/pty";
+import { terminalThemeFor } from "../design/terminal-theme";
+import { useTheme } from "../theme/ThemeProvider";
 
 export interface TerminalProps {
   command: string;
@@ -26,36 +28,12 @@ export interface TerminalProps {
 const FONT_FAMILY =
   '"JetBrains Mono", "Cascadia Code", "Fira Code", "Consolas", ui-monospace, monospace';
 
-const THEME = {
-  background: "#0a0a0b",
-  foreground: "#e4e4e7",
-  cursor: "#d48256",
-  cursorAccent: "#0a0a0b",
-  selectionBackground: "#3f3f46",
-  black: "#18181b",
-  red: "#f87171",
-  green: "#4ade80",
-  yellow: "#facc15",
-  blue: "#60a5fa",
-  magenta: "#c084fc",
-  cyan: "#22d3ee",
-  white: "#e4e4e7",
-  brightBlack: "#52525b",
-  brightRed: "#fca5a5",
-  brightGreen: "#86efac",
-  brightYellow: "#fde68a",
-  brightBlue: "#93c5fd",
-  brightMagenta: "#d8b4fe",
-  brightCyan: "#67e8f9",
-  brightWhite: "#fafafa",
-};
-
 async function smartPaste(term: XTerm, handle: number): Promise<void> {
   let text: string | null = null;
   try {
     text = await readText();
   } catch {
-    // clipboard read failed; fall through to image-paste path
+    text = null;
   }
   if (text) {
     term.paste(text);
@@ -82,10 +60,14 @@ function waitForLayout(el: HTMLElement): Promise<void> {
 
 export function Terminal({ command, args, cwd, className }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const termRef = useRef<XTerm | null>(null);
   const argsRef = useRef(args);
   const cwdRef = useRef(cwd);
   argsRef.current = args;
   cwdRef.current = cwd;
+
+  const { resolved } = useTheme();
+  const initialThemeRef = useRef(resolved);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -108,8 +90,9 @@ export function Terminal({ command, args, cwd, className }: TerminalProps) {
         scrollback: 10_000,
         allowProposedApi: true,
         macOptionIsMeta: true,
-        theme: THEME,
+        theme: terminalThemeFor(initialThemeRef.current),
       });
+      termRef.current = term;
 
       const fit = new FitAddon();
       term.loadAddon(fit);
@@ -142,26 +125,32 @@ export function Terminal({ command, args, cwd, className }: TerminalProps) {
       try {
         fit.fit();
       } catch {
-        // renderer might not be ready yet; resize observer will retry
+        // renderer not ready; resize observer retries
       }
       term.focus();
 
       const onContainerClick = () => term.focus();
       container.addEventListener("click", onContainerClick);
 
-      let resizeRaf: number | null = null;
+      let lastSentCols = term.cols;
+      let lastSentRows = term.rows;
+      let pendingResize: number | null = null;
+      const flushResize = () => {
+        pendingResize = null;
+        if (handle == null) return;
+        if (term.cols === lastSentCols && term.rows === lastSentRows) return;
+        lastSentCols = term.cols;
+        lastSentRows = term.rows;
+        void ptyResize(handle, term.cols, term.rows);
+      };
       const resizeObserver = new ResizeObserver(() => {
-        if (resizeRaf != null) cancelAnimationFrame(resizeRaf);
-        resizeRaf = requestAnimationFrame(() => {
-          try {
-            fit.fit();
-            if (handle != null) {
-              void ptyResize(handle, term.cols, term.rows);
-            }
-          } catch {
-            // ignore transient sizing errors
-          }
-        });
+        try {
+          fit.fit();
+        } catch {
+          return;
+        }
+        if (pendingResize != null) window.clearTimeout(pendingResize);
+        pendingResize = window.setTimeout(flushResize, 180);
       });
       resizeObserver.observe(container);
 
@@ -169,13 +158,14 @@ export function Terminal({ command, args, cwd, className }: TerminalProps) {
       let unlistenExit: UnlistenFn | null = null;
 
       cleanup = () => {
-        if (resizeRaf != null) cancelAnimationFrame(resizeRaf);
+        if (pendingResize != null) window.clearTimeout(pendingResize);
         resizeObserver.disconnect();
         container.removeEventListener("click", onContainerClick);
         dataSub.dispose();
         unlistenOutput?.();
         unlistenExit?.();
         if (handle != null) void ptyKill(handle).catch(() => {});
+        termRef.current = null;
         term.dispose();
       };
 
@@ -214,6 +204,12 @@ export function Terminal({ command, args, cwd, className }: TerminalProps) {
       cleanup?.();
     };
   }, [command]);
+
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term) return;
+    term.options.theme = terminalThemeFor(resolved);
+  }, [resolved]);
 
   return <div ref={containerRef} className={className} />;
 }

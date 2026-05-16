@@ -1,11 +1,41 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: oklch(0.145 0 0);
-  --color-foreground: oklch(0.985 0 0);
+  --color-bg: oklch(0.145 0 0);
+  --color-bg-elevated: oklch(0.21 0 0);
+  --color-fg: oklch(0.985 0 0);
+  --color-fg-muted: oklch(0.7 0 0);
+  --color-border: oklch(0.28 0 0);
+  --color-accent: oklch(0.72 0.12 50);
+  --color-accent-fg: oklch(0.14 0 0);
+  --color-ring: oklch(0.72 0.12 50 / 0.6);
+  --color-overlay: oklch(0 0 0 / 0.55);
+
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
+  --radius-full: 0;
+
   --font-mono:
     "JetBrains Mono", "Cascadia Code", "Fira Code", "Consolas", ui-monospace,
     monospace;
+}
+
+[data-theme="light"] {
+  --color-bg: oklch(0.99 0 0);
+  --color-bg-elevated: oklch(0.965 0 0);
+  --color-fg: oklch(0.18 0 0);
+  --color-fg-muted: oklch(0.48 0 0);
+  --color-border: oklch(0.88 0 0);
+  --color-accent: oklch(0.62 0.14 45);
+  --color-accent-fg: oklch(0.99 0 0);
+  --color-ring: oklch(0.62 0.14 45 / 0.5);
+  --color-overlay: oklch(0.2 0 0 / 0.35);
 }
 
 html,
@@ -17,8 +47,8 @@ body,
 
 body {
   margin: 0;
-  background-color: oklch(0.145 0 0);
-  color: oklch(0.985 0 0);
+  background-color: var(--color-bg);
+  color: var(--color-fg);
   font-family:
     ui-sans-serif,
     system-ui,
@@ -30,6 +60,9 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
 }
 
 .xterm,
@@ -48,10 +81,15 @@ body {
 }
 
 .xterm-viewport::-webkit-scrollbar-thumb {
-  background: oklch(0.3 0 0);
-  border-radius: 9999px;
+  background: transparent;
+  border-radius: 0;
+  transition: background-color 150ms ease;
 }
 
-.xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.4 0 0);
+.xterm-viewport:hover::-webkit-scrollbar-thumb {
+  background: oklch(0.5 0 0 / 0.45);
+}
+
+.xterm-viewport:hover::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.5 0 0 / 0.7);
 }

@@ -1,22 +1,79 @@
+import { useCallback, useEffect, useState } from "react";
 import { Terminal } from "./components/Terminal";
+import { TitleBar } from "./components/TitleBar";
+import { SettingsDialog } from "./components/SettingsDialog";
+import { useSkipPermissions } from "./settings/skipPermissions";
+
+type SessionMode = "new" | "resume";
+
+function buildArgs(skipPermissions: boolean, mode: SessionMode): string[] {
+  const out: string[] = [];
+  if (skipPermissions) out.push("--dangerously-skip-permissions");
+  if (mode === "resume") out.push("--resume");
+  return out;
+}
 
 export function App() {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [skipPermissions] = useSkipPermissions();
+
+  const [activeArgs, setActiveArgs] = useState<string[]>(() =>
+    buildArgs(skipPermissions, "new"),
+  );
+  const [sessionNonce, setSessionNonce] = useState(0);
+
+  const restart = useCallback(
+    (mode: SessionMode) => {
+      setActiveArgs(buildArgs(skipPermissions, mode));
+      setSessionNonce((n) => n + 1);
+    },
+    [skipPermissions],
+  );
+
+  const onNewSession = useCallback(() => restart("new"), [restart]);
+  const onResumeSession = useCallback(() => restart("resume"), [restart]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && !e.altKey && !e.metaKey) {
+        if (!e.shiftKey && e.key === ",") {
+          e.preventDefault();
+          setSettingsOpen((prev) => !prev);
+          return;
+        }
+        if (e.shiftKey && (e.key === "N" || e.key === "n")) {
+          e.preventDefault();
+          onNewSession();
+          return;
+        }
+        if (e.shiftKey && (e.key === "R" || e.key === "r")) {
+          e.preventDefault();
+          onResumeSession();
+          return;
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", onKey, { capture: true });
+  }, [onNewSession, onResumeSession]);
+
   return (
-    <main className="flex h-full overflow-hidden bg-zinc-950 text-zinc-100">
-      <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-9 shrink-0 items-center border-b border-zinc-800 px-3 text-xs font-medium tracking-wide text-zinc-400 uppercase">
-          terminal · claude
-        </header>
-        <Terminal command="claude" className="min-h-0 flex-1 overflow-hidden" />
-      </section>
-      <aside className="flex w-96 shrink-0 flex-col overflow-hidden border-l border-zinc-800 bg-zinc-900/60">
-        <header className="flex h-9 shrink-0 items-center border-b border-zinc-800 px-3 text-xs font-medium tracking-wide text-zinc-400 uppercase">
-          side panel
-        </header>
-        <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-zinc-500">
-          Hook-driven side panel arrives in iteration 3.
-        </div>
-      </aside>
+    <main className="flex h-full flex-col overflow-hidden bg-bg text-fg">
+      <TitleBar
+        onNewSession={onNewSession}
+        onResumeSession={onResumeSession}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+      <div className="min-h-0 flex-1 overflow-hidden px-4 pb-4">
+        <Terminal
+          key={sessionNonce}
+          command="claude"
+          args={activeArgs}
+          className="h-full w-full overflow-hidden"
+        />
+      </div>
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </main>
   );
 }

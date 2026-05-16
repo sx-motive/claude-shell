@@ -28,8 +28,10 @@ claude-shell **must operate exclusively within the Claude subscription pool**. I
 **Verification before each merge:**
 
 ```bash
-git grep -nE '(\-p\b|--print|--output-format|--input-format|stream-json|claude-agent-sdk|anthropic-ai/claude-agent-sdk|api\.anthropic\.com|ANTHROPIC_API_KEY)' -- ':!PLAN.md' ':!CLAUDE.md' ':!README.md'
+git grep -nIE '(\-p\b|--print|--output-format|--input-format|stream-json|claude-agent-sdk|anthropic-ai/claude-agent-sdk|api\.anthropic\.com|ANTHROPIC_API_KEY)' -- ':!PLAN.md' ':!CLAUDE.md' ':!README.md' ':!package-lock.json' ':!src-tauri/Cargo.lock'
 ```
+
+(`-I` skips binary assets so icon files don't false-positive; lock files excluded because they contain hash strings that occasionally pattern-match.)
 
 The command must return zero matches. Any hit blocks the merge.
 
@@ -99,6 +101,126 @@ Plugin abstraction is deferred until iteration 8+, only if a second non-chat plu
 
 ---
 
+## Iteration 1.1 — Frameless chat window & tray
+
+Billing-neutral interlude before the 2026-06-15 gate. Goal: single chat window — no system title bar, custom buttons in the top-right (new / resume / settings / minimize), settings dialog with theme picker and `--dangerously-skip-permissions` toggle, system tray with close-to-tray.
+
+**Window chrome:**
+
+- [ ] `tauri.conf.json`: `decorations: false`, `transparent: false`, `minWidth: 800` / `minHeight: 600`.
+- [ ] Custom top strip (~36px) with `data-tauri-drag-region` outside the button cluster.
+- [ ] Top-right buttons, left → right: **New session** (lucide `Plus`), **Resume** (lucide `History`), **Settings** (lucide `Settings`), **Minimize** (lucide `Minus`). All icon-only with native `title` tooltips.
+- [ ] Minimize → `window.hide()` (to tray), not OS-minimize.
+- [ ] Intercept close-requested (Alt+F4, OS close gesture) → hide to tray. Quit only via tray menu.
+- [ ] No window rounding anywhere (`--radius-*` tokens forced to 0, scrollbar thumb square).
+- [ ] Padding `px-4 pb-4` around the terminal area so content doesn't touch window edges.
+
+**System tray:**
+
+- [ ] Tauri 2 built-in tray (`tauri::tray::TrayIconBuilder`). Icon = app icon (pixel-art coral robot).
+- [ ] Left-click → show + focus.
+- [ ] Right-click → menu: `Show`, `Quit`.
+
+**Theme system:**
+
+- [ ] OKLCH semantic CSS variables in `src/styles.css`: `--color-bg`, `--color-bg-elevated`, `--color-fg`, `--color-fg-muted`, `--color-border`, `--color-accent`, `--color-overlay`. Both light and dark resolve the same names.
+- [ ] `[data-theme="dark" | "light"]` on `<html>`. `ThemeProvider` (`src/theme/ThemeProvider.tsx`) reads `localStorage["claude-shell:theme"]` ∈ {`system`, `light`, `dark`}; system fallback via `prefers-color-scheme`.
+- [ ] Inline pre-paint script in `index.html` sets `data-theme` before React renders (no FOUC).
+- [ ] Xterm theme extracted to `src/design/terminal-theme.ts` with `dark` and `light` variants. Terminal reacts to theme changes via `term.options.theme = …` — no PTY respawn.
+- [ ] Xterm scrollbar invisible by default, fades in on hover over the viewport.
+
+**Settings dialog:**
+
+- [ ] Centered shadcn `Dialog`. Opens via Settings button and `Ctrl+,`.
+- [ ] **Theme** section: segmented control `System` / `Light` / `Dark`. Live-applies.
+- [ ] **Claude** section: `Switch` for "Skip permission prompts" (passes `--dangerously-skip-permissions`). Default ON. Note: "Takes effect on the next session" — toggling does **not** auto-restart claude (avoids surprising mid-conversation kills).
+- [ ] All settings persisted via `localStorage`; tauri-plugin-store migration in iter 4.
+
+**New / Resume buttons:**
+
+- [ ] Plus button → kill current PTY, spawn fresh claude with current `--dangerously-skip-permissions` setting. Hotkey: `Ctrl+Shift+N`.
+- [ ] History button → kill current PTY, spawn claude with `--resume` (claude shows its own TUI session picker). Hotkey: `Ctrl+Shift+R`.
+- [ ] Snapshot of args is taken at restart-button-click time, not on every settings change.
+
+**Resize debounce (TUI banner mitigation):**
+
+- [ ] Visual `fit.fit()` on every ResizeObserver tick; `pty_resize` (real SIGWINCH equivalent) debounced 180ms and skipped if cols/rows unchanged. Reduces claude TUI banner duplication during continuous window dragging (root cause is upstream Ink not using alt-screen).
+
+**Minimal shadcn scaffold:**
+
+- [ ] Deps: `clsx`, `tailwind-merge`, `class-variance-authority`, `lucide-react`, `@radix-ui/react-dialog`, `@radix-ui/react-radio-group`, `@radix-ui/react-switch`, `@radix-ui/react-slot`.
+- [ ] `src/lib/utils.ts` with `cn()`.
+- [ ] Copy-paste only: `Button`, `Dialog`, `Switch`, `Segmented` (RadioGroup-based).
+
+**App icon:**
+
+- [ ] Custom pixel-art icon (coral robot on transparent background). Source PNG upscaled 640→1024 with nearest-neighbor, then `tauri icon` generates full size set.
+
+**Checkpoint:**
+
+- [ ] Frameless window opens; only chat + top strip + 4 buttons visible.
+- [ ] Drag region works (clicking empty top strip drags the window).
+- [ ] Minimize → tray; left-click tray restores; right-click tray → Quit exits.
+- [ ] Alt+F4 / OS close hides to tray.
+- [ ] Settings open via button and `Ctrl+,`; theme + skip-permissions persist across restart.
+- [ ] Theme switch applies to UI chrome + xterm without PTY respawn.
+- [ ] New / Resume buttons restart claude with correct flags; hotkeys work.
+- [ ] All iter-1 terminal behaviors still pass (spawn, text/image paste, resize, scrollback, Ctrl+C, links).
+- [ ] Window/taskbar/tray show the custom robot icon.
+- [ ] Billing-invariant grep returns clean.
+
+**Known upstream issues (not our bug):**
+
+- `claude agents` view freezes after opening a session and returning ([claude-code#59688](https://github.com/anthropics/claude-code/issues/59688)). Reproduces in plain Windows Terminal. Workaround: use our `+` button to kill and respawn. Tabs in **iter 1.2** are the structural fix for managing parallel sessions independent of this upstream bug.
+
+---
+
+## Iteration 1.2 — Tabs (bottom bar)
+
+Multi-session support inside our window, independent of `claude agents`. Each tab owns its own PTY. Tab bar lives at the bottom of the window (slim row).
+
+**State & lifecycle:**
+
+- [ ] App state: `tabs: Array<{ id, args, label, createdAt }>` + `activeTabId`. Initial state: one tab with current default args.
+- [ ] Each tab renders a `<Terminal>` mounted but only one is visible (`display: none` for inactive). Don't unmount — preserve scrollback and PTY state.
+- [ ] On tab close: kill that tab's PTY, remove from list. If closing active tab, activate the previous one (or right neighbor).
+- [ ] If last tab is closed: render an empty state with "New session" CTA (no auto-spawn).
+
+**Tab bar:**
+
+- [ ] Slim row (~30px) at the bottom of the window, below the terminal padding.
+- [ ] Each tab pill: short label, optional close `×` on hover. Active tab visually distinct (bg-elevated + accent underline or border).
+- [ ] Click pill → switch active. Middle-click pill → close.
+- [ ] Overflow: horizontal scroll if too many tabs (no fancy reorder/drag in 1.2).
+
+**Wiring with existing buttons & hotkeys:**
+
+- [ ] `+` (New) button → opens **new tab** with current `--dangerously-skip-permissions` setting (no `--resume`). `Ctrl+Shift+N`.
+- [ ] `History` (Resume) button → opens **new tab** with `--resume`. `Ctrl+Shift+R`.
+- [ ] Hotkeys: `Ctrl+W` close active tab, `Ctrl+Tab` / `Ctrl+Shift+Tab` cycle, `Ctrl+1` … `Ctrl+9` jump to nth.
+- [ ] Setting toggle "Skip permission prompts" still affects only **new** tabs created after the change; live tabs keep their startup args.
+
+**Tab labels:**
+
+- [ ] Default: `Session 1`, `Session 2`, … (per-app counter, not persisted across app restarts).
+- [ ] Stretch: capture first user prompt from PTY stream and use as label (truncated). If too much complexity, skip — leave for a later iteration.
+
+**Xterm visibility quirks:**
+
+- [ ] When a tab becomes active again after being hidden, call `fit.fit()` + `term.refresh(0, term.rows - 1)` to force redraw (renderer may have skipped frames while hidden).
+- [ ] Resize observer keeps running for hidden tabs too — but real `pty_resize` only fires for active tab (inactive PTYs keep their last size; reactivation triggers a fit + resize).
+
+**Checkpoint:**
+
+- [ ] Open 3 tabs, each runs independent claude. Switching preserves scrollback and prompt state.
+- [ ] Closing middle tab keeps the others alive; closing all tabs shows empty state.
+- [ ] `+` opens a fresh new tab. `History` opens a tab in `--resume` picker.
+- [ ] `Ctrl+Tab` cycles; `Ctrl+W` closes; `Ctrl+1..9` jumps.
+- [ ] Resize redistributes correctly when switching tabs (no leftover-cells artifact).
+- [ ] Billing-invariant grep returns clean.
+
+---
+
 ## Iteration 2 — Hooks infrastructure
 
 - [ ] Rust HTTP server (axum) bound to `127.0.0.1:0` (OS-assigned random port), in-process
@@ -147,9 +269,9 @@ Plugin abstraction is deferred until iteration 8+, only if a second non-chat plu
 - [ ] Window size/position persistence (Tauri store plugin)
 - [ ] Single-instance enforcement (`tauri-plugin-single-instance`)
 - [ ] System notification on `Stop` hook when window is unfocused (Tauri notification plugin)
-- [ ] Global keybindings: Ctrl+1 focus terminal, Ctrl+2 focus side panel, Ctrl+K clear screen (sends `clear` to PTY or xterm `term.clear()`), Ctrl+, open settings
-- [ ] Settings panel: theme (dark only for now), font family, font size, hook installation toggle (with explanation that disabling loses rich features), notification on/off
-- [ ] App icon + `.ico` / `.icns`
+- [ ] Global keybindings: Ctrl+K clear screen (sends `clear` to PTY or xterm `term.clear()`). Settings (Ctrl+,), new tab (Ctrl+Shift+N), resume (Ctrl+Shift+R), tab nav (Ctrl+1..9 / Ctrl+Tab / Ctrl+W) already shipped in 1.1/1.2.
+- [ ] Settings panel: migrate `localStorage` settings to `tauri-plugin-store`. Add font family / size / cursor style / hook-install toggle / notification on-off to the existing dialog (theme picker and skip-permissions already there from 1.1).
+- [ ] App icon already in 1.1; revisit for monochrome tray variant if the colored icon reads poorly in light system trays.
 
 **Checkpoint:**
 
