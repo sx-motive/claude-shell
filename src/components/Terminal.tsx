@@ -23,6 +23,7 @@ export interface TerminalProps {
   args?: string[];
   cwd?: string;
   className?: string;
+  active?: boolean;
 }
 
 const FONT_FAMILY =
@@ -58,9 +59,17 @@ function waitForLayout(el: HTMLElement): Promise<void> {
   });
 }
 
-export function Terminal({ command, args, cwd, className }: TerminalProps) {
+export function Terminal({
+  command,
+  args,
+  cwd,
+  className,
+  active = true,
+}: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
+  const fitRef = useRef<FitAddon | null>(null);
+  const ptyHandleRef = useRef<number | null>(null);
   const argsRef = useRef(args);
   const cwdRef = useRef(cwd);
   argsRef.current = args;
@@ -95,6 +104,7 @@ export function Terminal({ command, args, cwd, className }: TerminalProps) {
       termRef.current = term;
 
       const fit = new FitAddon();
+      fitRef.current = fit;
       term.loadAddon(fit);
       term.loadAddon(new WebLinksAddon());
       term.loadAddon(new SearchAddon());
@@ -165,6 +175,8 @@ export function Terminal({ command, args, cwd, className }: TerminalProps) {
         unlistenOutput?.();
         unlistenExit?.();
         if (handle != null) void ptyKill(handle).catch(() => {});
+        fitRef.current = null;
+        ptyHandleRef.current = null;
         termRef.current = null;
         term.dispose();
       };
@@ -189,6 +201,8 @@ export function Terminal({ command, args, cwd, className }: TerminalProps) {
         return;
       }
 
+      ptyHandleRef.current = handle;
+
       unlistenOutput = await onPtyOutput(handle, (bytes) => term.write(bytes));
       unlistenExit = await onPtyExit(handle, ({ code }) => {
         term.write(
@@ -210,6 +224,25 @@ export function Terminal({ command, args, cwd, className }: TerminalProps) {
     if (!term) return;
     term.options.theme = terminalThemeFor(resolved);
   }, [resolved]);
+
+  useEffect(() => {
+    if (!active) return;
+    const raf = requestAnimationFrame(() => {
+      const term = termRef.current;
+      const fit = fitRef.current;
+      if (!term || !fit) return;
+      try {
+        fit.fit();
+      } catch {
+        return;
+      }
+      const handle = ptyHandleRef.current;
+      if (handle != null) void ptyResize(handle, term.cols, term.rows);
+      term.refresh(0, term.rows - 1);
+      term.focus();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [active]);
 
   return <div ref={containerRef} className={className} />;
 }
