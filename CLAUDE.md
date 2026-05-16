@@ -18,6 +18,8 @@ claude-shell must operate **exclusively within the Claude subscription pool**. I
 - Passive reads of `~/.claude/projects/<encoded-cwd>/*.jsonl` for session history.
 - Idempotent reads/writes of `~/.claude/settings.json` to install/remove our hooks.
 
+**Caveat (added 2026-05-16):** Anthropic has not publicly documented the technical signals it uses to distinguish pools. Our architecture is a reverse-engineered safe bet, not a guarantee. The following are confirmed-forbidden by official documentation. Other features (hooks, `Task` tool, MCP) have unclear billing status and require empirical verification post-2026-06-15. See PLAN.md "Open questions" section.
+
 **Forbidden (each of these moves usage into the Agent SDK pool):**
 
 - `claude -p` or `--print` flag.

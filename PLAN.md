@@ -6,6 +6,8 @@ Hooks-driven desktop client around the interactive `claude` CLI. `claude` runs i
 
 claude-shell **must operate exclusively within the Claude subscription pool**. It must **never** touch the Agent SDK credit pool or the API billing pool.
 
+**As of 2026-05-16, Anthropic has not publicly documented the technical signals used to distinguish pools.** The architecture below is the safest reverse-engineered bet (interactive PTY = subscription; piped/`-p`/stream-json = SDK). This assumption is verified after the 2026-06-15 cutover, not before. See "Open questions tied to the 2026-06-15 cutover" below.
+
 **Allowed:**
 
 - Spawn `claude` interactively via PTY (no flags that change input/output format).
@@ -30,6 +32,19 @@ git grep -nE '(\-p\b|--print|--output-format|--input-format|stream-json|claude-a
 ```
 
 The command must return zero matches. Any hit blocks the merge.
+
+## Open questions tied to the 2026-06-15 cutover
+
+These are **undocumented by Anthropic** as of 2026-05-16. Each one, if it lands the wrong way, changes our plan. We verify all of them in the first week after 2026-06-15 by spending small known amounts of credit and watching the meter.
+
+| Question | If subscription-pool (good) | If Agent-SDK-pool (bad) |
+|---|---|---|
+| Are hooks installed by claude-shell billed differently? | iter 2–3 ship as written | Side panel features (iter 3, 6) become opt-in with prominent "may consume SDK credit" warning. Default = off. |
+| Is the `Task` tool (subagents) from an interactive session SDK-billed? | No action needed | Add detection in iter 3: when Task fires, surface a per-call cost warning. Recommend system prompt that discourages Task use. |
+| Are MCP tools in interactive sessions SDK-billed? | No action needed | Same UI treatment as Task — flag each MCP invocation. |
+| Does parent-process inspection by `claude` flag custom terminals? | iter 1 works as planned | Re-evaluate entire architecture; possibly fall back to "rich side panel via passive .jsonl tailing only, no hooks". |
+
+**Mitigation: gate iter 2 on the cutover.** Iteration 1 (raw PTY terminal) is fully viable as a v0.1 MVP on its own. Do not start iteration 2 until at least one full week of real billing data post-2026-06-15 is in hand and the above questions are answered for our specific stack.
 
 ## Workflow
 
@@ -185,6 +200,22 @@ Plugin abstraction is deferred until iteration 8+, only if a second non-chat plu
 - [ ] Stop server in terminal → panel reflects stopped state
 - [ ] Start a second dev server while first is running → both visible as tabs
 - [ ] Billing-invariant grep returns clean
+
+---
+
+## Iteration 6.5 — Billing observability
+
+(Conditional: only build if any of iter 2–6 features ended up partially in the Agent SDK pool after the 2026-06-15 cutover. Otherwise skip.)
+
+- [ ] Read usage data from `~/.claude/projects/*/*.jsonl` (claude writes per-message token counts and tool invocation records there)
+- [ ] Aggregate per-session: subscription-pool calls, suspected-SDK-pool calls (Task, MCP, hooks-triggered actions if confirmed billable)
+- [ ] Show current-cycle estimate against the user's Agent SDK credit limit
+- [ ] Warn in real time when a tool call that's suspected-SDK-pool is about to fire (PreToolUse hook returns an approval prompt)
+
+**Checkpoint:**
+
+- [ ] Numbers visibly match what Anthropic shows in their dashboard (cross-check after a known set of tasks)
+- [ ] Warnings fire before, not after, suspected SDK-pool calls
 
 ---
 
