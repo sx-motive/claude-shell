@@ -1,10 +1,23 @@
 # claude-shell — agent instructions
 
-Short, durable invariants for this repo. Read [PLAN.md](./PLAN.md) for the current iteration and roadmap.
+Short, durable invariants for this repo.
 
 ## What this is
 
-Desktop GUI client built around the **interactive** `claude` CLI. Architecture: PTY-hosted `claude` (xterm.js + portable-pty/ConPTY) on one side, and a side panel driven by **Claude Code hooks** on the other. Solo project, manual checkpoint after each iteration. See [README.md](./README.md) for stack rationale.
+Desktop GUI client built around the **interactive** `claude` CLI. Architecture: PTY-hosted `claude` (xterm.js + portable-pty/ConPTY) on one side, and a side panel driven by **Claude Code hooks** on the other. Solo project. See [README.md](./README.md) for stack rationale.
+
+## Anthropic billing-model cutover (2026-06-15)
+
+Anthropic is changing how subscription vs. Agent-SDK-credit usage is metered. As of today (date stamp in `currentDate`), the technical signals that distinguish the two pools are **undocumented**. The architecture below is a reverse-engineered safe bet, not a guarantee.
+
+After 2026-06-15, empirically verify with small known-cost runs which of the following are actually subscription-pool vs. SDK-credit-pool:
+
+- Hooks installed by claude-shell.
+- The `Task` tool (subagents) invoked from an interactive session.
+- MCP tools invoked from an interactive session.
+- Whether `claude`'s parent-process inspection flags custom terminals like ours.
+
+If any of these turn out to be SDK-billed, gate them behind explicit opt-in with a visible cost warning. Until verified, treat hooks/Task/MCP as "probably subscription, but unconfirmed".
 
 ## Billing model invariant (NON-NEGOTIABLE)
 
@@ -18,9 +31,7 @@ claude-shell must operate **exclusively within the Claude subscription pool**. I
 - Passive reads of `~/.claude/projects/<encoded-cwd>/*.jsonl` for session history.
 - Idempotent reads/writes of `~/.claude/settings.json` to install/remove our hooks.
 
-**Caveat (added 2026-05-16):** Anthropic has not publicly documented the technical signals it uses to distinguish pools. Our architecture is a reverse-engineered safe bet, not a guarantee. The following are confirmed-forbidden by official documentation. Other features (hooks, `Task` tool, MCP) have unclear billing status and require empirical verification post-2026-06-15. See PLAN.md "Open questions" section.
-
-**Forbidden (each of these moves usage into the Agent SDK pool):**
+**Forbidden (each of these moves usage into the Agent SDK pool, confirmed by official docs):**
 
 - `claude -p` or `--print` flag.
 - `--output-format stream-json` or `--input-format stream-json`.
@@ -29,14 +40,18 @@ claude-shell must operate **exclusively within the Claude subscription pool**. I
 - Direct HTTP calls to `api.anthropic.com`.
 - Setting `ANTHROPIC_API_KEY` for the child `claude` process — auth is the `claude` binary's responsibility, not ours.
 
-Before merging an iteration, run the verification grep from PLAN.md. Zero matches required.
+Before merging any branch to master, run this grep — zero matches required:
+
+```bash
+git grep -nIE '(\-p\b|--print|--output-format|--input-format|stream-json|claude-agent-sdk|anthropic-ai/claude-agent-sdk|api\.anthropic\.com|ANTHROPIC_API_KEY)' -- ':!CLAUDE.md' ':!README.md' ':!package-lock.json' ':!src-tauri/Cargo.lock'
+```
 
 ## Stack invariants
 
 - **Tauri 2**, not Electron. Don't import Electron patterns (no `BrowserWindow`, no `ipcRenderer`, no Node APIs in the renderer).
   - Frontend ↔ Rust: `invoke('command_name', args)` for request/response, `emit` / `listen` for streaming events.
   - All Rust commands live behind `#[tauri::command]` and are registered in `tauri::generate_handler!`.
-- **No cross-compilation.** Each platform binary is built on its native OS. Local dev = current OS only. Release builds happen in GitHub Actions (iteration 7).
+- **No cross-compilation.** Each platform binary is built on its native OS. Local dev = current OS only. Release builds happen in GitHub Actions.
 - **React 19 + Vite + TS strict.** No legacy class components. SPA inside a WebView.
 - **Tailwind 4** via the Vite plugin (not PostCSS config). shadcn/ui components are copy-pasted into `src/components/ui/`, not imported from a package.
 - **PTY layer:** `portable-pty` crate in Rust (uses ConPTY on Windows, forkpty elsewhere). Frontend uses `xterm` + addons (`fit`, `web-links`, `search`).
@@ -45,17 +60,17 @@ Before merging an iteration, run the verification grep from PLAN.md. Zero matche
 
 ## Process
 
-- **Worktree per iteration.** Each iteration from PLAN.md gets its own git worktree (`../claude-shell-iter-N`) and branch (`iter-N-<slug>`). Merge to `master` only after the iteration's checkpoint passes manually AND the billing-invariant grep is clean.
-- **Manual checkpoint is non-negotiable.** Don't start iteration N+1 until every checkbox under iteration N's "Checkpoint" section is verified by hand. Automated tests don't replace this — most checkpoints are UX validations.
-- **No premature abstraction.** Plugin system is iteration 8+ *because* there's no second plugin yet to validate the interface against. Don't generalize during iterations 1–7.
+- **Feature branches.** Work happens on `iter-N-<slug>` or similar branches in the main working directory. Merge to `master` only after manual UX validation AND the billing-invariant grep is clean. Delete the branch after merge.
+- **Manual checkpoint over automated tests.** Most validations are UX-level. Type checks and tests confirm code correctness, not feature correctness.
+- **No premature abstraction.** Don't build a plugin system, generalized config, or extension points until there's a second concrete use case to validate against.
 - **No comments in code.** Use clear names. Allowed only for `TODO:` / `FIXME:` with reason, or a hidden invariant that would surprise a reader.
 
 ## Things to push back on
 
 - Suggestions to use `--output-format stream-json`, `-p`, the Agent SDK, or to call the Anthropic API directly — these violate the billing invariant. Hard no, regardless of how convenient they look for a given feature.
 - Suggestions to add Electron, Node integration, or a bundled Chromium — the whole point of Tauri is the system WebView.
-- Suggestions to add a test framework with broad coverage targets — manual checkpoints are the spec until iteration 7.
-- Suggestions to ship a plugin architecture before iteration 8 lands.
+- Suggestions to add a test framework with broad coverage targets — manual checkpoints are the spec.
+- Suggestions to ship a plugin architecture before a second plugin candidate actually exists.
 - Suggestions to build our own SQLite session store when `~/.claude/projects/*/*.jsonl` is the source of truth.
 - Suggestions to add telemetry, analytics, or auto-error-reporting — personal-scale app, not needed.
 - Suggestions to handle `claude` auth ourselves — the binary handles it.

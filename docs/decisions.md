@@ -1,8 +1,6 @@
 # Locked design decisions
 
-Design choices locked during the iteration they were decided in. Each entry is
-referenced by later iterations and should not be reopened without a
-corresponding [PLAN.md](../PLAN.md) edit.
+Design choices locked when they were decided. Don't reopen without a deliberate revisit.
 
 ---
 
@@ -24,8 +22,7 @@ settings panel (`settings.claudePath`), persisted by the Tauri store plugin.
 - A settings-panel override keeps the escape hatch local to claude-shell and
   visible in the UI.
 
-**Status:** Implementation deferred to iteration 7 (empty-state handling for
-"no `claude` on PATH").
+**Status:** Not yet implemented.
 
 ### Hook transport
 
@@ -45,8 +42,8 @@ JSON payload from `claude` hooks on stdin and POSTs it to our server with
   a single executable invocation — we can't make `claude` HTTP-POST directly,
   and we don't want to depend on `curl` being on PATH.
 
-**Status:** Implementation deferred to iteration 2 (and iteration 2 itself is
-gated on the 2026-06-15 cutover per [PLAN.md](../PLAN.md)).
+**Status:** Not yet implemented. Gated on the 2026-06-15 Anthropic billing
+cutover (see [CLAUDE.md](../CLAUDE.md)) — hooks may or may not be subscription-billed.
 
 ### Hook installation into `~/.claude/settings.json`
 
@@ -70,4 +67,4 @@ untouched.
   as the key survives).
 - Idempotent merge means repeated launches don't accumulate duplicates.
 
-**Status:** Implementation deferred to iteration 2.
+**Status:** Not yet implemented.

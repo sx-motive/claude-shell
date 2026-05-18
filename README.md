@@ -21,4 +21,4 @@ Windows, macOS, Linux. Each binary is built on its native OS — cross-compilati
 
 ## Status
 
-Pre-alpha. See [PLAN.md](./PLAN.md) for the iteration roadmap.
+Pre-alpha.
