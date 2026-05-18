@@ -144,9 +144,8 @@ export function App() {
   ]);
 
   return (
-    <main className="flex h-full flex-col overflow-hidden bg-bg text-fg">
+    <main className="flex h-full flex-col overflow-hidden border border-border bg-bg text-fg">
       <TitleBar
-        onNewSession={onNewSession}
         onResumeSession={onResumeSession}
         onOpenSettings={() => setSettingsOpen(true)}
       />
@@ -183,6 +182,7 @@ export function App() {
         activeTabId={activeTabId}
         onActivate={setActiveTabId}
         onClose={closeTab}
+        onNewSession={onNewSession}
       />
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </main>

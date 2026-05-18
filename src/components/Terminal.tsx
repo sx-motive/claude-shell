@@ -28,7 +28,7 @@ export interface TerminalProps {
 }
 
 const FONT_FAMILY =
-  '"JetBrains Mono", "Cascadia Code", "Fira Code", "Consolas", ui-monospace, monospace';
+  '"Geist Mono Variable", "JetBrains Mono", "Cascadia Code", "Fira Code", "Consolas", ui-monospace, monospace';
 
 async function smartPaste(term: XTerm, handle: number): Promise<void> {
   let text: string | null = null;

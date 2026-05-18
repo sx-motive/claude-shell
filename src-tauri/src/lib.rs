@@ -22,6 +22,26 @@ fn show_main_window(app: &tauri::AppHandle) {
     }
 }
 
+#[cfg(windows)]
+fn disable_window_rounding(window: &tauri::WebviewWindow) {
+    use windows_sys::Win32::Foundation::HWND;
+    use windows_sys::Win32::Graphics::Dwm::{
+        DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND,
+    };
+
+    let Ok(raw) = window.hwnd() else { return };
+    let hwnd = raw.0 as HWND;
+    let pref: i32 = DWMWCP_DONOTROUND as i32;
+    unsafe {
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE as u32,
+            &pref as *const i32 as *const _,
+            std::mem::size_of::<i32>() as u32,
+        );
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let pty_state: PtyState = Arc::new(Mutex::new(PtyManager::default()));
@@ -44,6 +64,11 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            #[cfg(windows)]
+            if let Some(window) = app.get_webview_window("main") {
+                disable_window_rounding(&window);
+            }
+
             let show_item = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;

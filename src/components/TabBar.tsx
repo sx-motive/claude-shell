@@ -1,5 +1,5 @@
 import { MouseEvent } from "react";
-import { X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { cn } from "../lib/utils";
 
 export interface TabDescriptor {
@@ -12,9 +12,16 @@ interface TabBarProps {
   activeTabId: string | null;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
+  onNewSession: () => void;
 }
 
-export function TabBar({ tabs, activeTabId, onActivate, onClose }: TabBarProps) {
+export function TabBar({
+  tabs,
+  activeTabId,
+  onActivate,
+  onClose,
+  onNewSession,
+}: TabBarProps) {
   if (tabs.length === 0) return null;
 
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>, id: string) => {
@@ -25,7 +32,7 @@ export function TabBar({ tabs, activeTabId, onActivate, onClose }: TabBarProps) 
   };
 
   return (
-    <div className="flex h-7 shrink-0 items-stretch gap-px overflow-x-auto border-t border-border bg-bg px-4 font-mono text-xs">
+    <div className="flex h-7 shrink-0 items-stretch gap-px overflow-x-auto border-t border-border bg-bg px-4 text-xs">
       {tabs.map((tab) => {
         const active = tab.id === activeTabId;
         return (
@@ -39,7 +46,7 @@ export function TabBar({ tabs, activeTabId, onActivate, onClose }: TabBarProps) 
               "group relative flex shrink-0 cursor-default items-center transition-colors",
               active
                 ? "bg-bg-elevated text-fg shadow-[inset_0_-2px_0_0_var(--color-accent)]"
-                : "text-fg-muted hover:bg-bg-elevated/60 hover:text-fg",
+                : "text-fg-muted/50 hover:bg-bg-elevated/60 hover:text-fg",
             )}
           >
             <span className="max-w-44 truncate px-4">{tab.label}</span>
@@ -58,6 +65,15 @@ export function TabBar({ tabs, activeTabId, onActivate, onClose }: TabBarProps) 
           </div>
         );
       })}
+      <button
+        type="button"
+        aria-label="New session"
+        title="New session (Ctrl+Shift+N)"
+        onClick={onNewSession}
+        className="ml-1 flex h-full w-7 shrink-0 items-center justify-center text-fg-muted/60 hover:bg-bg-elevated hover:text-fg"
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }
