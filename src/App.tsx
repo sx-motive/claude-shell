@@ -4,21 +4,13 @@ import { TitleBar } from "./components/TitleBar";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { TabBar } from "./components/TabBar";
 import { useSkipPermissions } from "./settings/skipPermissions";
+import { buildArgs, type SessionMode } from "./lib/sessionArgs";
 import { cn } from "./lib/utils";
-
-type SessionMode = "new" | "resume";
 
 interface Tab {
   id: string;
   args: string[];
   label: string;
-}
-
-function buildArgs(skipPermissions: boolean, mode: SessionMode): string[] {
-  const out: string[] = [];
-  if (skipPermissions) out.push("--dangerously-skip-permissions");
-  if (mode === "resume") out.push("--resume");
-  return out;
 }
 
 function nextId(): string {

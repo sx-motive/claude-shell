@@ -193,3 +193,30 @@ pub fn pty_kill(state: State<'_, PtyState>, handle: u64) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(windows)]
+    const KNOWN_BIN: &str = "cmd";
+    #[cfg(not(windows))]
+    const KNOWN_BIN: &str = "sh";
+
+    #[test]
+    fn resolves_known_binary_on_path() {
+        let path = resolve_command(KNOWN_BIN).expect("known binary should resolve");
+        assert!(path.is_absolute(), "resolved path should be absolute");
+        assert!(path.exists(), "resolved path should exist on disk");
+    }
+
+    #[test]
+    fn missing_binary_returns_error_with_name() {
+        let err = resolve_command("definitely-not-a-real-binary-xyz123")
+            .expect_err("missing binary should fail");
+        assert!(
+            err.contains("definitely-not-a-real-binary-xyz123"),
+            "error message should mention the binary name, got: {err}"
+        );
+    }
+}
