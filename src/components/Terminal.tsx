@@ -5,6 +5,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { readText } from "@tauri-apps/plugin-clipboard-manager";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import "@xterm/xterm/css/xterm.css";
 
 import {
@@ -106,14 +107,20 @@ export function Terminal({
       const fit = new FitAddon();
       fitRef.current = fit;
       term.loadAddon(fit);
-      term.loadAddon(new WebLinksAddon());
+      term.loadAddon(
+        new WebLinksAddon((event, uri) => {
+          if (!event.ctrlKey && !event.metaKey) return;
+          void openUrl(uri).catch(() => {});
+        }),
+      );
       term.loadAddon(new SearchAddon());
 
       let handle: number | null = null;
 
       term.attachCustomKeyEventHandler((event) => {
+        if (event.type !== "keydown") return true;
+
         if (
-          event.type === "keydown" &&
           event.ctrlKey &&
           !event.shiftKey &&
           !event.altKey &&
@@ -124,6 +131,13 @@ export function Terminal({
           if (handle != null) void smartPaste(term, handle);
           return false;
         }
+
+        if (event.key === "Enter" && (event.shiftKey || event.ctrlKey)) {
+          event.preventDefault();
+          if (handle != null) void ptyWrite(handle, "\x1b\r");
+          return false;
+        }
+
         return true;
       });
 
@@ -154,6 +168,7 @@ export function Terminal({
         void ptyResize(handle, term.cols, term.rows);
       };
       const resizeObserver = new ResizeObserver(() => {
+        if (container.clientWidth === 0 || container.clientHeight === 0) return;
         try {
           fit.fit();
         } catch {
