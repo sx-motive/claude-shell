@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { Terminal } from "./components/Terminal";
 import { TitleBar } from "./components/TitleBar";
 import { SettingsDialog } from "./components/SettingsDialog";
@@ -6,8 +7,10 @@ import { SessionsDialog } from "./components/SessionsDialog";
 import { TabBar } from "./components/TabBar";
 import { useSkipPermissions } from "./settings/skipPermissions";
 import { resolveCommand, useClaudePath } from "./settings/claudePath";
+import { readNotifyOnIdle } from "./settings/notifyOnIdle";
 import { buildArgs, type SessionMode } from "./lib/sessionArgs";
 import { projectLabel, type SessionInfo } from "./lib/sessions";
+import { pushToast } from "./lib/toast";
 import { cn } from "./lib/utils";
 
 interface Tab {
@@ -38,7 +41,7 @@ export function App() {
         id: nextId(),
         command: resolveCommand(claudePath),
         args: buildArgs(skipPermissions, mode),
-        label: `Session ${n}`,
+        label: `Tab ${n}`,
       };
     },
     [skipPermissions, claudePath],
@@ -49,15 +52,71 @@ export function App() {
       id: nextId(),
       command: resolveCommand(claudePath),
       args: buildArgs(skipPermissions, { kind: "new" }),
-      label: "Session 1",
+      label: "Tab 1",
     },
   ]);
   const [activeTabId, setActiveTabId] = useState<string | null>(
     () => tabs[0]?.id ?? null,
   );
+  const [unreadTabs, setUnreadTabs] = useState<Set<string>>(() => new Set());
 
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
+
+  const activeTabIdRef = useRef(activeTabId);
+  activeTabIdRef.current = activeTabId;
+
+  const onTabReady = useCallback((id: string, label: string) => {
+    const tabActive = activeTabIdRef.current === id;
+    const mainOnScreen =
+      typeof document !== "undefined" &&
+      document.visibilityState === "visible" &&
+      document.hasFocus();
+
+    if (tabActive && mainOnScreen) return;
+
+    if (!tabActive) {
+      setUnreadTabs((prev) => {
+        if (prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      });
+    }
+    if (!readNotifyOnIdle()) return;
+    void pushToast({
+      title: "Ready",
+      body: `${label} is ready`,
+      tabId: id,
+    });
+  }, []);
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    let cancelled = false;
+    listen<string>("main://activate-tab", (event) => {
+      const id = event.payload;
+      if (typeof id !== "string" || !id) return;
+      setActiveTabId(id);
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeTabId == null) return;
+    setUnreadTabs((prev) => {
+      if (!prev.has(activeTabId)) return prev;
+      const next = new Set(prev);
+      next.delete(activeTabId);
+      return next;
+    });
+  }, [activeTabId]);
 
   useEffect(() => {
     if (tabs.length === 0) {
@@ -87,7 +146,7 @@ export function App() {
           ? labelBase.length > 32
             ? `${labelBase.slice(0, 31)}…`
             : labelBase
-          : `Session ${n}`;
+          : `Tab ${n}`;
       const tab: Tab = {
         id: nextId(),
         command: resolveCommand(claudePath),
@@ -104,6 +163,14 @@ export function App() {
     [claudePath, skipPermissions],
   );
 
+  const renameTab = useCallback((id: string, label: string) => {
+    const trimmed = label.trim().slice(0, 60);
+    if (!trimmed) return;
+    setTabs((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, label: trimmed } : t)),
+    );
+  }, []);
+
   const closeTab = useCallback((id: string) => {
     const prev = tabsRef.current;
     const idx = prev.findIndex((t) => t.id === id);
@@ -115,6 +182,12 @@ export function App() {
       if (next.length === 0) return null;
       const fallback = next[idx - 1] ?? next[idx] ?? next[0];
       return fallback.id;
+    });
+    setUnreadTabs((prev) => {
+      if (!prev.has(id)) return prev;
+      const n = new Set(prev);
+      n.delete(id);
+      return n;
     });
   }, []);
 
@@ -141,8 +214,14 @@ export function App() {
     const onKey = (e: KeyboardEvent) => {
       if (!e.ctrlKey || e.altKey || e.metaKey) return;
 
-      if (!e.shiftKey && e.key === ",") {
+      const consume = () => {
         e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      };
+
+      if (!e.shiftKey && e.key === ",") {
+        consume();
         setSettingsOpen((prev) => !prev);
         return;
       }
@@ -150,34 +229,34 @@ export function App() {
       if (settingsOpen || sessionsOpen) return;
 
       if (e.shiftKey && (e.key === "N" || e.key === "n")) {
-        e.preventDefault();
+        consume();
         onNewSession();
         return;
       }
       if (e.shiftKey && (e.key === "R" || e.key === "r")) {
-        e.preventDefault();
+        consume();
         onResumeSession();
         return;
       }
       if (e.shiftKey && (e.key === "H" || e.key === "h")) {
-        e.preventDefault();
+        consume();
         onOpenSessions();
         return;
       }
       if (!e.shiftKey && (e.key === "w" || e.key === "W")) {
-        e.preventDefault();
+        consume();
         if (activeTabId) closeTab(activeTabId);
         return;
       }
       if (e.key === "Tab") {
-        e.preventDefault();
+        consume();
         cycleTab(e.shiftKey ? -1 : 1);
         return;
       }
       if (!e.shiftKey && e.key >= "1" && e.key <= "9") {
         const n = parseInt(e.key, 10);
         if (n <= tabs.length) {
-          e.preventDefault();
+          consume();
           setActiveTabId(tabs[n - 1].id);
         }
         return;
@@ -227,7 +306,7 @@ export function App() {
                 args={tab.args}
                 cwd={tab.cwd}
                 active={tab.id === activeTabId}
-                notifyLabel={tab.label}
+                onClaudeReady={() => onTabReady(tab.id, tab.label)}
                 className="h-full w-full overflow-hidden"
               />
             </div>
@@ -237,8 +316,10 @@ export function App() {
       <TabBar
         tabs={tabs}
         activeTabId={activeTabId}
+        unreadIds={unreadTabs}
         onActivate={setActiveTabId}
         onClose={closeTab}
+        onRename={renameTab}
         onNewSession={onNewSession}
       />
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />

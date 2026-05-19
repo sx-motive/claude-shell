@@ -64,7 +64,7 @@ export function SessionsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[640px] gap-3">
+      <DialogContent className="gap-3">
         <DialogHeader>
           <DialogTitle>Sessions</DialogTitle>
           <DialogDescription>
@@ -81,7 +81,7 @@ export function SessionsDialog({
           className="w-full min-w-0 rounded-md border border-border bg-bg-elevated px-2 py-1.5 text-xs text-fg outline-none focus:border-fg-muted"
         />
 
-        <div className="max-h-[420px] min-w-0 overflow-x-hidden overflow-y-auto">
+        <div className="thin-scroll max-h-[320px] min-w-0 overflow-x-hidden overflow-y-auto">
           {error && (
             <div className="px-1 py-3 text-xs text-red-400">
               Failed to load sessions: {error}
@@ -114,7 +114,7 @@ export function SessionsDialog({
                         </span>
                         <span className="shrink-0">{s.messageCount} msg</span>
                         <span className="shrink-0">
-                          {relativeTime(s.lastTimestamp)}
+                          {relativeTime(s.lastTimestampMs)}
                         </span>
                       </span>
                     </div>

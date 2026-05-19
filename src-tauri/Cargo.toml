@@ -1,6 +1,6 @@
 [package]
 name = "claude-shell"
-version = "0.1.1"
+version = "0.2.0"
 description = "Hooks-driven desktop client around the interactive claude CLI"
 edition = "2021"
 rust-version = "1.77"
@@ -32,4 +32,4 @@ tauri-plugin-opener = "2.5.4"
 custom-protocol = ["tauri/custom-protocol"]
 
 [target."cfg(windows)".dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_Graphics_Dwm", "Win32_Foundation"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }

@@ -1,8 +1,12 @@
 use std::sync::{Arc, Mutex};
 
+mod overlay;
 mod pty;
 mod sessions;
 
+use overlay::{
+    hide_overlay_window, overlay_activate_tab, overlay_ready, push_overlay_toast,
+};
 use pty::{pty_kill, pty_resize, pty_spawn, pty_write, PtyManager, PtyState};
 use sessions::list_sessions;
 use tauri::{
@@ -79,7 +83,11 @@ pub fn run() {
             pty_spawn,
             pty_write,
             pty_resize,
-            pty_kill
+            pty_kill,
+            push_overlay_toast,
+            overlay_ready,
+            hide_overlay_window,
+            overlay_activate_tab
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -91,6 +99,12 @@ pub fn run() {
             #[cfg(windows)]
             if let Some(window) = app.get_webview_window("main") {
                 disable_window_rounding(&window);
+            }
+
+            if let Some(overlay) = app.get_webview_window("overlay") {
+                let _ = overlay.set_position(tauri::PhysicalPosition::new(-32000, -32000));
+                let _ = overlay.show();
+                let _ = overlay.hide();
             }
 
             let show_item = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;

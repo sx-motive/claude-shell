@@ -1,38 +1,14 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import {
-  isPermissionGranted,
-  requestPermission,
-  sendNotification,
-} from "@tauri-apps/plugin-notification";
-import { readNotifyOnIdle } from "../settings/notifyOnIdle";
-
 export interface IdleNotifierOptions {
   idleMs?: number;
   startupGraceMs?: number;
   minBytesForNotify?: number;
-  title?: string;
-  bodyFor?: () => string;
+  onReady?: () => void;
 }
 
 export interface IdleNotifier {
   noteOutput: (size: number) => void;
+  noteInput: () => void;
   dispose: () => void;
-}
-
-let permissionPromise: Promise<boolean> | null = null;
-function ensurePermission(): Promise<boolean> {
-  if (!permissionPromise) {
-    permissionPromise = (async () => {
-      try {
-        if (await isPermissionGranted()) return true;
-        const result = await requestPermission();
-        return result === "granted";
-      } catch {
-        return false;
-      }
-    })();
-  }
-  return permissionPromise;
 }
 
 export function createIdleNotifier(
@@ -41,15 +17,15 @@ export function createIdleNotifier(
   const idleMs = opts.idleMs ?? 900;
   const startupGraceMs = opts.startupGraceMs ?? 3000;
   const minBytes = opts.minBytesForNotify ?? 80;
-  const title = opts.title ?? "Claude Shell";
-  const bodyFor = opts.bodyFor ?? (() => "Session finished");
+  const onReady = opts.onReady;
 
   const createdAt = Date.now();
   let bytesSinceQuiet = 0;
   let timer: number | null = null;
   let disposed = false;
+  let armed = false;
 
-  const fire = async () => {
+  const fire = () => {
     timer = null;
     if (disposed) return;
     if (Date.now() - createdAt < startupGraceMs) {
@@ -58,20 +34,11 @@ export function createIdleNotifier(
     }
     const bytes = bytesSinceQuiet;
     bytesSinceQuiet = 0;
+    if (!armed) return;
     if (bytes < minBytes) return;
-    if (!readNotifyOnIdle()) return;
-
-    let focused = true;
+    armed = false;
     try {
-      focused = await getCurrentWindow().isFocused();
-    } catch {
-      focused = true;
-    }
-    if (focused) return;
-
-    if (!(await ensurePermission())) return;
-    try {
-      sendNotification({ title, body: bodyFor() });
+      onReady?.();
     } catch {
       // ignore
     }
@@ -83,6 +50,10 @@ export function createIdleNotifier(
       bytesSinceQuiet += size;
       if (timer != null) window.clearTimeout(timer);
       timer = window.setTimeout(fire, idleMs);
+    },
+    noteInput: () => {
+      if (disposed) return;
+      armed = true;
     },
     dispose: () => {
       disposed = true;

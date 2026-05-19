@@ -27,11 +27,26 @@ export interface TerminalProps {
   cwd?: string;
   className?: string;
   active?: boolean;
-  notifyLabel?: string;
+  onClaudeReady?: () => void;
 }
 
 const FONT_FAMILY =
   '"Geist Mono Variable", "JetBrains Mono", "Cascadia Code", "Fira Code", "Consolas", ui-monospace, monospace';
+
+const AUTO_REPLY_PATTERNS: RegExp[] = [
+  /^\x1b\[\d+;\d+R$/,
+  /^\x1b\[\?[\d;]+\$y$/,
+  /^\x1b\[\?[\d;]+c$/,
+  /^\x1b\[>[\d;]+c$/,
+];
+
+function isLikelyUserInput(data: string): boolean {
+  if (data === "\x1b[I" || data === "\x1b[O") return false;
+  for (const re of AUTO_REPLY_PATTERNS) {
+    if (re.test(data)) return false;
+  }
+  return true;
+}
 
 async function smartPaste(term: XTerm, handle: number): Promise<void> {
   let text: string | null = null;
@@ -69,10 +84,10 @@ export function Terminal({
   cwd,
   className,
   active = true,
-  notifyLabel,
+  onClaudeReady,
 }: TerminalProps) {
-  const notifyLabelRef = useRef(notifyLabel);
-  notifyLabelRef.current = notifyLabel;
+  const onClaudeReadyRef = useRef(onClaudeReady);
+  onClaudeReadyRef.current = onClaudeReady;
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -163,7 +178,12 @@ export function Terminal({
         return true;
       });
 
+      const notifier = createIdleNotifier({
+        onReady: () => onClaudeReadyRef.current?.(),
+      });
+
       const dataSub = term.onData((data) => {
+        if (isLikelyUserInput(data)) notifier.noteInput();
         if (handle != null) void ptyWrite(handle, data);
       });
 
@@ -202,13 +222,6 @@ export function Terminal({
 
       let unlistenOutput: UnlistenFn | null = null;
       let unlistenExit: UnlistenFn | null = null;
-
-      const notifier = createIdleNotifier({
-        bodyFor: () =>
-          notifyLabelRef.current
-            ? `${notifyLabelRef.current} is ready`
-            : "Session finished",
-      });
 
       cleanup = () => {
         if (pendingResize != null) window.clearTimeout(pendingResize);
