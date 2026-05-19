@@ -14,6 +14,24 @@ fn ping(msg: String) -> String {
     format!("pong: {msg}")
 }
 
+#[tauri::command]
+fn detect_claude_path() -> Option<String> {
+    which::which("claude")
+        .ok()
+        .map(|p| p.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn validate_claude_path(path: String) -> Result<String, String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err("path is empty".into());
+    }
+    let resolved =
+        which::which(trimmed).map_err(|e| format!("not found or not executable: {e}"))?;
+    Ok(resolved.to_string_lossy().into_owned())
+}
+
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -52,6 +70,8 @@ pub fn run() {
         .manage(pty_state)
         .invoke_handler(tauri::generate_handler![
             ping,
+            detect_claude_path,
+            validate_claude_path,
             pty_spawn,
             pty_write,
             pty_resize,

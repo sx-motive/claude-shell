@@ -4,11 +4,13 @@ import { TitleBar } from "./components/TitleBar";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { TabBar } from "./components/TabBar";
 import { useSkipPermissions } from "./settings/skipPermissions";
+import { resolveCommand, useClaudePath } from "./settings/claudePath";
 import { buildArgs, type SessionMode } from "./lib/sessionArgs";
 import { cn } from "./lib/utils";
 
 interface Tab {
   id: string;
+  command: string;
   args: string[];
   label: string;
 }
@@ -22,6 +24,7 @@ function nextId(): string {
 export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [skipPermissions] = useSkipPermissions();
+  const [claudePath] = useClaudePath();
 
   const counterRef = useRef(2);
   const makeTab = useCallback(
@@ -29,16 +32,18 @@ export function App() {
       const n = counterRef.current++;
       return {
         id: nextId(),
+        command: resolveCommand(claudePath),
         args: buildArgs(skipPermissions, mode),
         label: `Session ${n}`,
       };
     },
-    [skipPermissions],
+    [skipPermissions, claudePath],
   );
 
   const [tabs, setTabs] = useState<Tab[]>(() => [
     {
       id: nextId(),
+      command: resolveCommand(claudePath),
       args: buildArgs(skipPermissions, "new"),
       label: "Session 1",
     },
@@ -168,7 +173,7 @@ export function App() {
               )}
             >
               <Terminal
-                command="claude"
+                command={tab.command}
                 args={tab.args}
                 active={tab.id === activeTabId}
                 className="h-full w-full overflow-hidden"
