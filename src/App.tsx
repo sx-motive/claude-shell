@@ -56,6 +56,19 @@ export function App() {
     () => tabs[0]?.id ?? null,
   );
 
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+
+  useEffect(() => {
+    if (tabs.length === 0) {
+      if (activeTabId !== null) setActiveTabId(null);
+      return;
+    }
+    if (!activeTabId || !tabs.some((t) => t.id === activeTabId)) {
+      setActiveTabId(tabs[0].id);
+    }
+  }, [tabs, activeTabId]);
+
   const openTab = useCallback(
     (mode: SessionMode) => {
       const tab = makeTab(mode);
@@ -91,23 +104,19 @@ export function App() {
     [claudePath, skipPermissions],
   );
 
-  const closeTab = useCallback(
-    (id: string) => {
-      setTabs((prev) => {
-        const idx = prev.findIndex((t) => t.id === id);
-        if (idx === -1) return prev;
-        const next = [...prev.slice(0, idx), ...prev.slice(idx + 1)];
-        setActiveTabId((current) => {
-          if (current !== id) return current;
-          if (next.length === 0) return null;
-          const fallback = next[idx - 1] ?? next[idx] ?? next[0];
-          return fallback.id;
-        });
-        return next;
-      });
-    },
-    [],
-  );
+  const closeTab = useCallback((id: string) => {
+    const prev = tabsRef.current;
+    const idx = prev.findIndex((t) => t.id === id);
+    if (idx === -1) return;
+    const next = [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+    setTabs(next);
+    setActiveTabId((current) => {
+      if (current !== id) return current;
+      if (next.length === 0) return null;
+      const fallback = next[idx - 1] ?? next[idx] ?? next[0];
+      return fallback.id;
+    });
+  }, []);
 
   const cycleTab = useCallback(
     (direction: 1 | -1) => {
