@@ -123,16 +123,18 @@ export function Terminal({
 
       term.open(container);
 
-      let webgl: WebglAddon | null = null;
       try {
-        webgl = new WebglAddon();
+        const webgl = new WebglAddon();
         webgl.onContextLoss(() => {
-          webgl?.dispose();
-          webgl = null;
+          try {
+            webgl.dispose();
+          } catch {
+            // ignore
+          }
         });
         term.loadAddon(webgl);
       } catch {
-        webgl = null;
+        // GPU unavailable; fall back to default renderer
       }
 
       let handle: number | null = null;
@@ -212,16 +214,23 @@ export function Terminal({
         if (pendingResize != null) window.clearTimeout(pendingResize);
         resizeObserver.disconnect();
         container.removeEventListener("click", onContainerClick);
-        dataSub.dispose();
+        try {
+          dataSub.dispose();
+        } catch {
+          // ignore
+        }
         unlistenOutput?.();
         unlistenExit?.();
         if (handle != null) void ptyKill(handle).catch(() => {});
-        webgl?.dispose();
         notifier.dispose();
         fitRef.current = null;
         ptyHandleRef.current = null;
         termRef.current = null;
-        term.dispose();
+        try {
+          term.dispose();
+        } catch (err) {
+          console.warn("term.dispose threw:", err);
+        }
       };
 
       try {
