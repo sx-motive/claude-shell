@@ -22,8 +22,6 @@ export function TabBar({
   onClose,
   onNewSession,
 }: TabBarProps) {
-  if (tabs.length === 0) return null;
-
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>, id: string) => {
     if (e.button === 1) {
       e.preventDefault();
