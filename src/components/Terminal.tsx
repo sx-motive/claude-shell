@@ -3,6 +3,7 @@ import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
+import { WebglAddon } from "@xterm/addon-webgl";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { readText } from "@tauri-apps/plugin-clipboard-manager";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -93,7 +94,7 @@ export function Terminal({
       const term = new XTerm({
         fontFamily: FONT_FAMILY,
         fontSize: 13,
-        lineHeight: 1.2,
+        lineHeight: 16 / 13,
         letterSpacing: 0,
         cursorBlink: true,
         cursorStyle: "bar",
@@ -114,6 +115,20 @@ export function Terminal({
         }),
       );
       term.loadAddon(new SearchAddon());
+
+      term.open(container);
+
+      let webgl: WebglAddon | null = null;
+      try {
+        webgl = new WebglAddon();
+        webgl.onContextLoss(() => {
+          webgl?.dispose();
+          webgl = null;
+        });
+        term.loadAddon(webgl);
+      } catch {
+        webgl = null;
+      }
 
       let handle: number | null = null;
 
@@ -145,7 +160,6 @@ export function Terminal({
         if (handle != null) void ptyWrite(handle, data);
       });
 
-      term.open(container);
       try {
         fit.fit();
       } catch {
@@ -190,6 +204,7 @@ export function Terminal({
         unlistenOutput?.();
         unlistenExit?.();
         if (handle != null) void ptyKill(handle).catch(() => {});
+        webgl?.dispose();
         fitRef.current = null;
         ptyHandleRef.current = null;
         termRef.current = null;
