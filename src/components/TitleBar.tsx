@@ -3,11 +3,11 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Button } from "./ui/button";
 
 interface TitleBarProps {
-  onResumeSession: () => void;
+  onOpenSessions: () => void;
   onOpenSettings: () => void;
 }
 
-export function TitleBar({ onResumeSession, onOpenSettings }: TitleBarProps) {
+export function TitleBar({ onOpenSessions, onOpenSettings }: TitleBarProps) {
   return (
     <div
       data-tauri-drag-region
@@ -19,9 +19,9 @@ export function TitleBar({ onResumeSession, onOpenSettings }: TitleBarProps) {
         variant="ghost"
         size="icon"
         className="h-7 w-7 text-fg-muted/50"
-        aria-label="Resume session"
-        title="Resume session (Ctrl+Shift+R)"
-        onClick={onResumeSession}
+        aria-label="Sessions"
+        title="Sessions (Ctrl+Shift+H)"
+        onClick={onOpenSessions}
       >
         <History className="h-3.5 w-3.5" />
       </Button>

@@ -2,16 +2,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Terminal } from "./components/Terminal";
 import { TitleBar } from "./components/TitleBar";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { SessionsDialog } from "./components/SessionsDialog";
 import { TabBar } from "./components/TabBar";
 import { useSkipPermissions } from "./settings/skipPermissions";
 import { resolveCommand, useClaudePath } from "./settings/claudePath";
 import { buildArgs, type SessionMode } from "./lib/sessionArgs";
+import { projectLabel, type SessionInfo } from "./lib/sessions";
 import { cn } from "./lib/utils";
 
 interface Tab {
   id: string;
   command: string;
   args: string[];
+  cwd?: string;
   label: string;
 }
 
@@ -23,6 +26,7 @@ function nextId(): string {
 
 export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
   const [skipPermissions] = useSkipPermissions();
   const [claudePath] = useClaudePath();
 
@@ -44,7 +48,7 @@ export function App() {
     {
       id: nextId(),
       command: resolveCommand(claudePath),
-      args: buildArgs(skipPermissions, "new"),
+      args: buildArgs(skipPermissions, { kind: "new" }),
       label: "Session 1",
     },
   ]);
@@ -59,6 +63,32 @@ export function App() {
       setActiveTabId(tab.id);
     },
     [makeTab],
+  );
+
+  const openSessionTab = useCallback(
+    (session: SessionInfo) => {
+      const n = counterRef.current++;
+      const labelBase = session.title?.trim() || projectLabel(session.cwd);
+      const label =
+        labelBase && labelBase !== "—"
+          ? labelBase.length > 32
+            ? `${labelBase.slice(0, 31)}…`
+            : labelBase
+          : `Session ${n}`;
+      const tab: Tab = {
+        id: nextId(),
+        command: resolveCommand(claudePath),
+        args: buildArgs(skipPermissions, {
+          kind: "resume-id",
+          sessionId: session.sessionId,
+        }),
+        cwd: session.cwd ?? undefined,
+        label,
+      };
+      setTabs((prev) => [...prev, tab]);
+      setActiveTabId(tab.id);
+    },
+    [claudePath, skipPermissions],
   );
 
   const closeTab = useCallback(
@@ -91,8 +121,12 @@ export function App() {
     [tabs],
   );
 
-  const onNewSession = useCallback(() => openTab("new"), [openTab]);
-  const onResumeSession = useCallback(() => openTab("resume"), [openTab]);
+  const onNewSession = useCallback(() => openTab({ kind: "new" }), [openTab]);
+  const onResumeSession = useCallback(
+    () => openTab({ kind: "resume" }),
+    [openTab],
+  );
+  const onOpenSessions = useCallback(() => setSessionsOpen(true), []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -104,7 +138,7 @@ export function App() {
         return;
       }
 
-      if (settingsOpen) return;
+      if (settingsOpen || sessionsOpen) return;
 
       if (e.shiftKey && (e.key === "N" || e.key === "n")) {
         e.preventDefault();
@@ -114,6 +148,11 @@ export function App() {
       if (e.shiftKey && (e.key === "R" || e.key === "r")) {
         e.preventDefault();
         onResumeSession();
+        return;
+      }
+      if (e.shiftKey && (e.key === "H" || e.key === "h")) {
+        e.preventDefault();
+        onOpenSessions();
         return;
       }
       if (!e.shiftKey && (e.key === "w" || e.key === "W")) {
@@ -144,14 +183,16 @@ export function App() {
     cycleTab,
     onNewSession,
     onResumeSession,
+    onOpenSessions,
     settingsOpen,
+    sessionsOpen,
     tabs,
   ]);
 
   return (
     <main className="flex h-full flex-col overflow-hidden border border-border bg-bg text-fg">
       <TitleBar
-        onResumeSession={onResumeSession}
+        onOpenSessions={onOpenSessions}
         onOpenSettings={() => setSettingsOpen(true)}
       />
       <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -175,6 +216,7 @@ export function App() {
               <Terminal
                 command={tab.command}
                 args={tab.args}
+                cwd={tab.cwd}
                 active={tab.id === activeTabId}
                 className="h-full w-full overflow-hidden"
               />
@@ -190,6 +232,14 @@ export function App() {
         onNewSession={onNewSession}
       />
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SessionsDialog
+        open={sessionsOpen}
+        onOpenChange={setSessionsOpen}
+        onPickSession={(s) => {
+          setSessionsOpen(false);
+          openSessionTab(s);
+        }}
+      />
     </main>
   );
 }

@@ -1,8 +1,10 @@
 use std::sync::{Arc, Mutex};
 
 mod pty;
+mod sessions;
 
 use pty::{pty_kill, pty_resize, pty_spawn, pty_write, PtyManager, PtyState};
+use sessions::list_sessions;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -72,6 +74,7 @@ pub fn run() {
             ping,
             detect_claude_path,
             validate_claude_path,
+            list_sessions,
             pty_spawn,
             pty_write,
             pty_resize,
