@@ -78,45 +78,45 @@ export function SessionsDialog({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Filter by title, project or id…"
-          className="rounded-md border border-border bg-bg px-2 py-1.5 text-xs text-fg outline-none focus:border-fg-muted"
+          className="w-full min-w-0 rounded-md border border-border bg-bg-elevated px-2 py-1.5 text-xs text-fg outline-none focus:border-fg-muted"
         />
 
-        <div className="-mx-2 max-h-[420px] overflow-y-auto">
+        <div className="max-h-[420px] min-w-0 overflow-x-hidden overflow-y-auto">
           {error && (
-            <div className="px-2 py-4 text-xs text-red-400">
+            <div className="px-1 py-3 text-xs text-red-400">
               Failed to load sessions: {error}
             </div>
           )}
           {!error && filtered === null && (
-            <div className="px-2 py-4 text-xs text-fg-muted">Loading…</div>
+            <div className="px-1 py-3 text-xs text-fg-muted">Loading…</div>
           )}
           {!error && filtered && filtered.length === 0 && (
-            <div className="px-2 py-4 text-xs text-fg-muted">
+            <div className="px-1 py-3 text-xs text-fg-muted">
               No sessions found.
             </div>
           )}
           {!error && filtered && filtered.length > 0 && (
-            <ul className="grid gap-px">
+            <ul className="grid gap-1">
               {filtered.slice(0, 200).map((s) => (
-                <li key={s.sessionId}>
+                <li key={s.sessionId} className="min-w-0">
                   <button
                     type="button"
                     onClick={() => onPickSession(s)}
-                    className="group flex w-full items-start gap-3 rounded-md px-2 py-2 text-left hover:bg-bg"
+                    className="group flex w-full min-w-0 items-start gap-3 rounded-md px-3 py-2.5 text-left hover:bg-bg"
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm text-fg">
+                    <div className="grid min-w-0 flex-1 gap-0.5">
+                      <span className="block truncate text-sm text-fg">
                         {s.title ?? "(no title)"}
-                      </div>
-                      <div className="mt-0.5 flex items-center gap-2 text-[11px] text-fg-muted">
-                        <span className="truncate font-mono">
+                      </span>
+                      <span className="flex min-w-0 items-center gap-2 text-[11px] text-fg-muted">
+                        <span className="min-w-0 flex-1 truncate font-mono">
                           {projectLabel(s.cwd)}
                         </span>
-                        <span>•</span>
-                        <span>{s.messageCount} msg</span>
-                        <span>•</span>
-                        <span>{relativeTime(s.lastTimestamp)}</span>
-                      </div>
+                        <span className="shrink-0">{s.messageCount} msg</span>
+                        <span className="shrink-0">
+                          {relativeTime(s.lastTimestamp)}
+                        </span>
+                      </span>
                     </div>
                   </button>
                 </li>
