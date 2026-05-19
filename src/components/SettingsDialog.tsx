@@ -12,6 +12,7 @@ import { Switch } from "./ui/switch";
 import { useTheme, type ThemePreference } from "../theme/ThemeProvider";
 import { useSkipPermissions } from "../settings/skipPermissions";
 import { useClaudePath } from "../settings/claudePath";
+import { useNotifyOnIdle } from "../settings/notifyOnIdle";
 import { detectClaudePath, validateClaudePath } from "../lib/claudeBin";
 
 type BinaryStatus =
@@ -38,6 +39,7 @@ const themeOptions: Array<{
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { preference, setPreference } = useTheme();
   const [skipPermissions, setSkipPermissions] = useSkipPermissions();
+  const [notifyOnIdle, setNotifyOnIdle] = useNotifyOnIdle();
   const [claudePath, setClaudePath] = useClaudePath();
   const [pathDraft, setPathDraft] = useState(claudePath);
   const [status, setStatus] = useState<BinaryStatus>({ kind: "idle" });
@@ -128,6 +130,24 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               id="skip-permissions"
               checked={skipPermissions}
               onCheckedChange={setSkipPermissions}
+            />
+          </label>
+
+          <label
+            htmlFor="notify-on-idle"
+            className="flex cursor-pointer items-start justify-between gap-4"
+          >
+            <span className="grid gap-1">
+              <span className="text-sm text-fg">Notify when Claude finishes</span>
+              <span className="text-xs text-fg-muted">
+                Pops a system notification when output goes quiet and the window
+                isn't focused.
+              </span>
+            </span>
+            <Switch
+              id="notify-on-idle"
+              checked={notifyOnIdle}
+              onCheckedChange={setNotifyOnIdle}
             />
           </label>
 

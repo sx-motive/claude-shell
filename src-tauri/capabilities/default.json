@@ -11,6 +11,8 @@
     "core:window:allow-start-dragging",
     "core:window:allow-close",
     "clipboard-manager:allow-read-text",
+    "notification:default",
+    "core:window:allow-is-focused",
     {
       "identifier": "opener:allow-open-url",
       "allow": [{ "url": "http://**" }, { "url": "https://**" }]

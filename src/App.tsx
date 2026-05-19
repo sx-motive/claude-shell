@@ -218,6 +218,7 @@ export function App() {
                 args={tab.args}
                 cwd={tab.cwd}
                 active={tab.id === activeTabId}
+                notifyLabel={tab.label}
                 className="h-full w-full overflow-hidden"
               />
             </div>

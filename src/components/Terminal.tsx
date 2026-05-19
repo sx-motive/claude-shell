@@ -17,6 +17,7 @@ import {
   ptySpawn,
   ptyWrite,
 } from "../lib/pty";
+import { createIdleNotifier } from "../lib/idleNotifier";
 import { terminalThemeFor } from "../design/terminal-theme";
 import { useTheme } from "../theme/ThemeProvider";
 
@@ -26,6 +27,7 @@ export interface TerminalProps {
   cwd?: string;
   className?: string;
   active?: boolean;
+  notifyLabel?: string;
 }
 
 const FONT_FAMILY =
@@ -67,7 +69,10 @@ export function Terminal({
   cwd,
   className,
   active = true,
+  notifyLabel,
 }: TerminalProps) {
+  const notifyLabelRef = useRef(notifyLabel);
+  notifyLabelRef.current = notifyLabel;
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -196,6 +201,13 @@ export function Terminal({
       let unlistenOutput: UnlistenFn | null = null;
       let unlistenExit: UnlistenFn | null = null;
 
+      const notifier = createIdleNotifier({
+        bodyFor: () =>
+          notifyLabelRef.current
+            ? `${notifyLabelRef.current} is ready`
+            : "Session finished",
+      });
+
       cleanup = () => {
         if (pendingResize != null) window.clearTimeout(pendingResize);
         resizeObserver.disconnect();
@@ -205,6 +217,7 @@ export function Terminal({
         unlistenExit?.();
         if (handle != null) void ptyKill(handle).catch(() => {});
         webgl?.dispose();
+        notifier.dispose();
         fitRef.current = null;
         ptyHandleRef.current = null;
         termRef.current = null;
@@ -233,7 +246,10 @@ export function Terminal({
 
       ptyHandleRef.current = handle;
 
-      unlistenOutput = await onPtyOutput(handle, (bytes) => term.write(bytes));
+      unlistenOutput = await onPtyOutput(handle, (bytes) => {
+        term.write(bytes);
+        notifier.noteOutput(bytes.length);
+      });
       unlistenExit = await onPtyExit(handle, ({ code }) => {
         term.write(
           `\r\n\x1b[90m[process exited with code ${code ?? "unknown"}]\x1b[0m\r\n`,
