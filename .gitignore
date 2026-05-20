@@ -25,8 +25,9 @@ src-tauri/gen/
 *.swp
 *.swo
 
-# Claude Code local settings
+# Claude Code local settings + agent instructions
 .claude/
+CLAUDE.md
 
 # OS
 .DS_Store

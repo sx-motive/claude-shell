@@ -1,24 +1,45 @@
-# claude-shell
+# Claude Shell
 
-A fast, minimal desktop client for Claude Code (and other CLI agents later).
+A small, fast desktop client for the `claude` CLI — built for the Claude Code subscription on Windows and macOS.
 
-## Why
+It wraps the interactive `claude` binary in a real terminal (xterm.js + ConPTY/forkpty), adds tabs, persistent sessions, a system tray, idle-notifications, and an auto-updater. No Anthropic API key, no SDK calls — it talks to whatever `claude` CLI you already have logged in.
 
-The standard terminal experience around Claude Code on Windows is rough: no clipboard image paste, awkward selection, no system notifications when the assistant finishes, generic look. Existing alternatives (Warp, etc.) feel slow or bloated.
+![status](https://img.shields.io/badge/status-pre--alpha-orange)
 
-This is a personal-scale GUI client built around the agent, not a general-purpose terminal that happens to host one.
+## Install
 
-## Stack
+Grab the latest installer from the [Releases page](https://github.com/sx-motive/claude-shell/releases/latest):
 
-- **Tauri 2** (Rust + system WebView) — small bundle, fast startup, low memory
-- **React 19 + TypeScript + Vite**
-- **Tailwind CSS 4** + **shadcn/ui**
-- **SQLite** (`rusqlite`) for session persistence
+- **Windows** — `Claude.Shell_*_x64-setup.exe`
+- **macOS** — `Claude.Shell_*_universal.dmg`
 
-## Platforms
+Installers are unsigned (personal-scale project) so first launch will show SmartScreen / Gatekeeper warnings — choose "Run anyway" / right-click → Open.
 
-Windows, macOS, Linux. Each binary is built on its native OS — cross-compilation is not supported by Tauri. CI (GitHub Actions) handles cross-platform release builds.
+After install, subsequent versions install themselves on launch via the built-in updater.
 
-## Status
+## Requirements
 
-Pre-alpha.
+- The official `claude` CLI installed and logged in (`claude` should run from your shell). On first launch you can point Claude Shell at a custom path in Settings if needed.
+
+## What you get
+
+- Tabs with per-tab session state
+- Recent-sessions picker (reads `~/.claude/projects/*.jsonl`)
+- System tray + notifications when Claude finishes while the window is unfocused
+- WebGL terminal renderer
+- Auto-update from signed GitHub Releases
+
+## Build from source
+
+Requires Node 20+ and Rust stable.
+
+```bash
+npm ci
+npm run tauri:dev
+```
+
+Production builds run on the OS they target — no cross-compilation.
+
+## License
+
+MIT
