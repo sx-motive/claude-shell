@@ -4,6 +4,7 @@ import { Terminal } from "./components/Terminal";
 import { TitleBar } from "./components/TitleBar";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { SessionsDialog } from "./components/SessionsDialog";
+import { UpdateDialog } from "./components/UpdateDialog";
 import { TabBar } from "./components/TabBar";
 import { useSkipPermissions } from "./settings/skipPermissions";
 import { resolveCommand, useClaudePath } from "./settings/claudePath";
@@ -11,7 +12,7 @@ import { readNotifyOnIdle } from "./settings/notifyOnIdle";
 import { buildArgs, type SessionMode } from "./lib/sessionArgs";
 import { projectLabel, type SessionInfo } from "./lib/sessions";
 import { pushToast } from "./lib/toast";
-import { runUpdateCheck } from "./lib/updateCheck";
+import { checkForUpdate, type UpdateAvailable } from "./lib/updateCheck";
 import { cn } from "./lib/utils";
 
 interface Tab {
@@ -31,6 +32,7 @@ function nextId(): string {
 export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [update, setUpdate] = useState<UpdateAvailable | null>(null);
   const [skipPermissions] = useSkipPermissions();
   const [claudePath] = useClaudePath();
 
@@ -93,7 +95,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    void runUpdateCheck();
+    void checkForUpdate().then(setUpdate);
   }, []);
 
   useEffect(() => {
@@ -336,6 +338,7 @@ export function App() {
           openSessionTab(s);
         }}
       />
+      <UpdateDialog update={update} onDismiss={() => setUpdate(null)} />
     </main>
   );
 }
