@@ -51,10 +51,14 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Claude Shell ${{ github.ref_name }}'
-          releaseBody: 'Unsigned builds — SmartScreen / Gatekeeper warnings expected on first launch.'
+          releaseBody: 'Unsigned installer (SmartScreen / Gatekeeper warning on first launch). Auto-update is signed with the project keypair.'
           releaseDraft: false
           prerelease: false
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
           args: ${{ matrix.args }}

@@ -11,6 +11,7 @@ import { readNotifyOnIdle } from "./settings/notifyOnIdle";
 import { buildArgs, type SessionMode } from "./lib/sessionArgs";
 import { projectLabel, type SessionInfo } from "./lib/sessions";
 import { pushToast } from "./lib/toast";
+import { runUpdateCheck } from "./lib/updateCheck";
 import { cn } from "./lib/utils";
 
 interface Tab {
@@ -89,6 +90,10 @@ export function App() {
       body: `${label} is ready`,
       tabId: id,
     });
+  }, []);
+
+  useEffect(() => {
+    void runUpdateCheck();
   }, []);
 
   useEffect(() => {

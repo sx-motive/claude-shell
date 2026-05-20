@@ -13,6 +13,8 @@
     "clipboard-manager:allow-read-text",
     "notification:default",
     "core:window:allow-is-focused",
+    "updater:default",
+    "process:allow-restart",
     {
       "identifier": "opener:allow-open-url",
       "allow": [{ "url": "http://**" }, { "url": "https://**" }]

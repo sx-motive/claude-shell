@@ -1,6 +1,6 @@
 [package]
 name = "claude-shell"
-version = "0.2.0"
+version = "0.2.1"
 description = "Hooks-driven desktop client around the interactive claude CLI"
 edition = "2021"
 rust-version = "1.77"
@@ -27,6 +27,8 @@ dirs = "5"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-opener = "2.5.4"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
