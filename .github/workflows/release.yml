@@ -13,11 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: macos-latest
-            args: --target universal-apple-darwin
-          - platform: windows-latest
-            args: ''
+        include: ${{ fromJSON(endsWith(github.ref_name, '-win') && '[{"platform":"windows-latest","args":""}]' || '[{"platform":"macos-latest","args":"--target universal-apple-darwin"},{"platform":"windows-latest","args":""}]') }}
 
     runs-on: ${{ matrix.platform }}
 
