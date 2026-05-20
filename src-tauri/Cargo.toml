@@ -1,6 +1,6 @@
 [package]
 name = "claude-shell"
-version = "0.2.3"
+version = "0.2.4"
 description = "Hooks-driven desktop client around the interactive claude CLI"
 edition = "2021"
 rust-version = "1.77"

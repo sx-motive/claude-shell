@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { Monitor, Moon, Sun } from "lucide-react";
 import {
   Dialog,
@@ -43,6 +44,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [claudePath, setClaudePath] = useClaudePath();
   const [pathDraft, setPathDraft] = useState(claudePath);
   const [status, setStatus] = useState<BinaryStatus>({ kind: "idle" });
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    void getVersion().then(setVersion).catch(() => setVersion(null));
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -179,6 +185,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             </span>
           </label>
         </div>
+
+        {version && (
+          <div className="mt-2 text-center text-xs text-fg-muted">
+            Claude Shell v{version}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
