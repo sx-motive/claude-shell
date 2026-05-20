@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -18,6 +18,7 @@ interface VisibleToast extends ToastPayload {
 const DEFAULT_DURATION_MS = 5000;
 const EXIT_ANIM_MS = 160;
 const HIDE_DELAY_MS = 220;
+const OVERLAY_WIDTH = 360;
 
 type AudioContextCtor = typeof AudioContext;
 
@@ -69,6 +70,7 @@ export function OverlayApp() {
   const [toasts, setToasts] = useState<VisibleToast[]>([]);
   const timersRef = useRef(new Map<string, number>());
   const hideTimerRef = useRef<number | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let unlisten: UnlistenFn | null = null;
@@ -131,6 +133,22 @@ export function OverlayApp() {
     }, HIDE_DELAY_MS);
   }, [toasts.length]);
 
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const sync = () => {
+      const height = Math.max(1, Math.ceil(el.scrollHeight));
+      void invoke("resize_overlay_window", {
+        width: OVERLAY_WIDTH,
+        height,
+      }).catch(() => {});
+    };
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const dismiss = (id: string) => {
     const exitTimer = timersRef.current.get(`${id}:exit`);
     if (exitTimer != null) {
@@ -157,7 +175,7 @@ export function OverlayApp() {
   };
 
   return (
-    <div className="flex h-full w-full flex-col gap-2 p-3">
+    <div ref={containerRef} className="flex w-full flex-col gap-2 p-3">
       {toasts.map((t) => (
         <div
           key={t.id}

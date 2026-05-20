@@ -1,7 +1,7 @@
 use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition};
+use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -173,6 +173,20 @@ pub fn hide_overlay_window(app: AppHandle) -> Result<(), String> {
     if let Some(overlay) = app.get_webview_window("overlay") {
         let _ = overlay.hide();
     }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn resize_overlay_window(app: AppHandle, width: u32, height: u32) -> Result<(), String> {
+    let Some(overlay) = app.get_webview_window("overlay") else {
+        return Ok(());
+    };
+    let w = width.max(1) as f64;
+    let h = height.max(1) as f64;
+    overlay
+        .set_size(LogicalSize::new(w, h))
+        .map_err(|e| e.to_string())?;
+    position_top_right(&overlay);
     Ok(())
 }
 

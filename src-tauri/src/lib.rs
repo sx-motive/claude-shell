@@ -6,6 +6,7 @@ mod sessions;
 
 use overlay::{
     hide_overlay_window, overlay_activate_tab, overlay_ready, push_overlay_toast,
+    resize_overlay_window,
 };
 use pty::{pty_kill, pty_resize, pty_spawn, pty_write, PtyManager, PtyState};
 use sessions::list_sessions;
@@ -89,7 +90,8 @@ pub fn run() {
             push_overlay_toast,
             overlay_ready,
             hide_overlay_window,
-            overlay_activate_tab
+            overlay_activate_tab,
+            resize_overlay_window
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
