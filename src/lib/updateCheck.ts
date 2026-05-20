@@ -9,8 +9,17 @@ export async function runUpdateCheck(): Promise<void> {
   started = true;
 
   try {
+    console.info("[updater] check starting");
     const update = await check();
-    if (!update) return;
+    console.info("[updater] check result", update);
+    if (!update) {
+      await pushToast({
+        title: "Updater",
+        body: "Версия актуальная (нет апдейта)",
+        durationMs: 4000,
+      });
+      return;
+    }
 
     await pushToast({
       title: "Доступно обновление",
@@ -26,6 +35,8 @@ export async function runUpdateCheck(): Promise<void> {
     await update.downloadAndInstall();
     await relaunch();
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     console.warn("[updater] check failed", err);
+    window.alert(`Updater error:\n${message}`);
   }
 }
