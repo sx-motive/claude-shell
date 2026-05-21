@@ -503,7 +503,7 @@ dependencies = [
 
 [[package]]
 name = "claude-shell"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "base64 0.22.1",
  "dirs 5.0.1",

@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
@@ -103,6 +104,59 @@ fn show_no_activate(window: &tauri::WebviewWindow) {
     let _ = window.show();
 }
 
+static CURSOR_TRACKING_STARTED: AtomicBool = AtomicBool::new(false);
+
+#[cfg(windows)]
+fn cursor_pos() -> Option<(i32, i32)> {
+    use windows_sys::Win32::Foundation::POINT;
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
+    let mut pt = POINT { x: 0, y: 0 };
+    if unsafe { GetCursorPos(&mut pt) } == 0 {
+        return None;
+    }
+    Some((pt.x, pt.y))
+}
+
+#[cfg(not(windows))]
+fn cursor_pos() -> Option<(i32, i32)> {
+    None
+}
+
+fn ensure_cursor_tracking(app: &AppHandle) {
+    if CURSOR_TRACKING_STARTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let mut last_inside = false;
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            let Some(overlay) = app.get_webview_window("overlay") else {
+                continue;
+            };
+            let visible = overlay.is_visible().unwrap_or(false);
+            if !visible {
+                if last_inside {
+                    let _ = overlay.set_ignore_cursor_events(true);
+                    last_inside = false;
+                }
+                continue;
+            }
+            let Some((cx, cy)) = cursor_pos() else { continue };
+            let Ok(pos) = overlay.outer_position() else { continue };
+            let Ok(size) = overlay.outer_size() else { continue };
+            let inside = cx >= pos.x
+                && cx < pos.x + size.width as i32
+                && cy >= pos.y
+                && cy < pos.y + size.height as i32;
+            if inside != last_inside {
+                let _ = overlay.set_ignore_cursor_events(!inside);
+                last_inside = inside;
+            }
+        }
+    });
+}
+
 fn position_top_right(window: &tauri::WebviewWindow) {
     let Ok(Some(monitor)) = window.primary_monitor() else {
         return;
@@ -128,9 +182,11 @@ pub fn push_overlay_toast(app: AppHandle, payload: ToastPayload) -> Result<bool,
     let overlay = app
         .get_webview_window("overlay")
         .ok_or_else(|| "overlay window missing".to_string())?;
+    let _ = overlay.set_ignore_cursor_events(true);
     position_top_right(&overlay);
     show_no_activate(&overlay);
     let _ = overlay.set_always_on_top(true);
+    ensure_cursor_tracking(&app);
 
     let ready = {
         let mut s = state().lock().unwrap();
@@ -171,6 +227,7 @@ pub fn overlay_ready(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn hide_overlay_window(app: AppHandle) -> Result<(), String> {
     if let Some(overlay) = app.get_webview_window("overlay") {
+        let _ = overlay.set_ignore_cursor_events(true);
         let _ = overlay.hide();
     }
     Ok(())

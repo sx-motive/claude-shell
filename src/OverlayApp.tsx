@@ -175,7 +175,7 @@ export function OverlayApp() {
   };
 
   return (
-    <div ref={containerRef} className="flex w-full flex-col gap-2 p-3">
+    <div ref={containerRef} className="flex w-full flex-col gap-2">
       {toasts.map((t) => (
         <div
           key={t.id}
